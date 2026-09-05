@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iOS Virtual Simulator</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: #1a1a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* iPhone Frame */
+        .iphone {
+            width: 375px;
+            height: 812px;
+            background-color: #000;
+            border-radius: 50px;
+            box-shadow: 0 0 0 12px #333, 0 0 0 13px #1a1a1a, 0 20px 50px rgba(0, 0, 0, 0.8);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Dynamic Island / Notch */
+        .dynamic-island {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 120px;
+            height: 35px;
+            background-color: #000;
+            border-radius: 20px;
+            z-index: 1000;
+            transition: all 0.3s ease;
+        }
+
+        /* Status Bar */
+        .status-bar {
+            position: absolute;
+            top: 0;
+            width: 100%;
+            height: 50px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            padding: 0 30px 8px 30px;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 600;
+            z-index: 900;
+        }
+
+        /* Screen Wrapper */
+        .screen {
+            width: 100%;
+            height: 100%;
+            background: url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1000&auto=format&fit=crop') center/cover;
+            position: relative;
+        }
+
+        /* Lock Screen */
+        .lock-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 80px;
+            color: #fff;
+            backdrop-filter: blur(0px);
+            transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.5s ease;
+            z-index: 800;
+        }
+
+        .lock-screen.unlocked {
+            transform: translateY(-100%);
+            opacity: 0;
+        }
+
+        .lock-clock {
+            font-size: 72px;
+            font-weight: 200;
+            letter-spacing: -2px;
+        }
+
+        .lock-date {
+            font-size: 18px;
+            font-weight: 500;
+            margin-top: -10px;
+        }
+
+        .unlock-prompt {
+            position: absolute;
+            bottom: 60px;
+            font-size: 14px;
+            opacity: 0.8;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.9; }
+        }
+
+        /* Home Screen Grid */
+        .home-screen {
+            padding: 70px 20px 20px 20px;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 22px 15px;
+        }
+
+        .app-icon {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .icon-box {
+            width: 60px;
+            height: 60px;
+            border-radius: 14px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 24px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            transition: transform 0.1s ease;
+        }
+
+        .app-icon:active .icon-box {
+            transform: scale(0.9);
+        }
+
+        .app-label {
+            color: white;
+            font-size: 11px;
+            margin-top: 5px;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+        }
+
+        /* Sample App View */
+        .app-window {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #fff;
+            z-index: 850;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transform: scale(0);
+            opacity: 0;
+            border-radius: 50px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .app-window.open {
+            transform: scale(1);
+            opacity: 1;
+            border-radius: 0;
+        }
+
+        /* Home Indicator Bar */
+        .home-bar {
+            position: absolute;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 135px;
+            height: 5px;
+            background-color: #fff;
+            border-radius: 3px;
+            z-index: 1000;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="iphone">
+        <div class="dynamic-island"></div>
+
+        <div class="status-bar">
+            <span id="status-time">09:41</span>
+            <span>5G 🔋</span>
+        </div>
+
+        <div class="screen">
+            <!-- Lock Screen -->
+            <div class="lock-screen" id="lockScreen" onclick="unlockDevice()">
+                <div class="lock-date" id="lock-date">Monday, June 5</div>
+                <div class="lock-clock" id="lock-time">09:41</div>
+                <div class="unlock-prompt">Click anywhere to unlock</div>
+            </div>
+
+            <!-- Home Screen -->
+            <div class="home-screen">
+                <div class="app-icon" onclick="openApp('Safari')">
+                    <div class="icon-box" style="background: linear-gradient(135deg, #007aff, #00c6ff);">🌐</div>
+                    <span class="app-label">Safari</span>
+                </div>
+                <div class="app-icon" onclick="openApp('Photos')">
+                    <div class="icon-box" style="background: #fff; color: #000;">🖼️</div>
+                    <span class="app-label">Photos</span>
+                </div>
+                <div class="app-icon" onclick="openApp('Settings')">
+                    <div class="icon-box" style="background: linear-gradient(135deg, #8e8e93, #636366);">⚙️</div>
+                    <span class="app-label">Settings</span>
+                </div>
+                <div class="app-icon" onclick="openApp('Notes')">
+                    <div class="icon-box" style="background: linear-gradient(135deg, #ffcc00, #ff9500);">📝</div>
+                    <span class="app-label">Notes</span>
+                </div>
+            </div>
+
+            <!-- App Window Overlay -->
+            <div class="app-window" id="appWindow">
+                <h2 id="appTitle">App</h2>
+                <p style="color: #666; margin-top: 10px;">Simulation View</p>
+            </div>
+
+            <!-- Home Bar -->
+            <div class="home-bar" onclick="goHome()"></div>
+        </div>
+    </div>
+
+    <script>
+        // Real-time Clock
+        function updateClock() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const timeString = `${hours}:${minutes}`;
+
+            const options = { weekday: 'long', month: 'long', day: 'numeric' };
+            const dateString = now.toLocaleDateString('en-US', options);
+
+            document.getElementById('status-time').textContent = timeString;
+            document.getElementById('lock-time').textContent = timeString;
+            document.getElementById('lock-date').textContent = dateString;
+        }
+
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // Lock / Unlock Logic
+        function unlockDevice() {
+            document.getElementById('lockScreen').classList.add('unlocked');
+        }
+
+        // App Launching Logic
+        function openApp(appName) {
+            const appWindow = document.getElementById('appWindow');
+            document.getElementById('appTitle').textContent = appName;
+            appWindow.classList.add('open');
+        }
+
+        // Return to Home Screen
+        function goHome() {
+            const lockScreen = document.getElementById('lockScreen');
+            const appWindow = document.getElementById('appWindow');
+
+            if (appWindow.classList.contains('open')) {
+                appWindow.classList.remove('open');
+            } else if (!lockScreen.classList.contains('unlocked')) {
+                unlockDevice();
+            } else {
+                // Relock if home bar pressed on home screen
+                lockScreen.classList.remove('unlocked');
+            }
+        }
+    </script>
+</body>
+</html>
